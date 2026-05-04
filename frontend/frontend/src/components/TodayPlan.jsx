@@ -5,7 +5,7 @@ import { Skeleton } from "../components/ui/skeleton";
 import { toast } from "sonner";
 
 const HERO_BG =
-  "https://static.prod-images.emergentagent.com/jobs/92b98fe4-1988-4d01-b248-6daff90afef5/images/7d672c3e2626a6dbfd6b972e7fef36608eadd370d69f9b5f9dbd1ebc002c9b0d.png";
+  "";
 
 const moodColor = {
   Bullish: "#2E6D4E",
