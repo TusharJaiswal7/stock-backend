@@ -1,0 +1,160 @@
+@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@500,700,800,900&f[]=manrope@400,500,600,700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #F5F5F0;
+  --surface: #FFFFFF;
+  --surface-muted: #F0EFEB;
+  --primary: #224834;
+  --primary-hover: #1A3A29;
+  --accent-buy: #2E6D4E;
+  --accent-sell: #B75C46;
+  --accent-hold: #D48B3E;
+  --text-primary: #1C211F;
+  --text-secondary: #59635E;
+  --text-tertiary: #8A928D;
+  --border: #E5E5DE;
+  --glass-bg: rgba(245, 245, 240, 0.85);
+}
+
+@layer base {
+  :root {
+    --background: 60 17% 95%;
+    --foreground: 150 7% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 150 7% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 7% 12%;
+    --primary: 142 36% 21%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 50 12% 93%;
+    --secondary-foreground: 150 7% 12%;
+    --muted: 50 12% 93%;
+    --muted-foreground: 150 5% 37%;
+    --accent: 50 12% 93%;
+    --accent-foreground: 150 7% 12%;
+    --destructive: 13 47% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 60 11% 89%;
+    --input: 60 11% 89%;
+    --ring: 142 36% 21%;
+    --radius: 1rem;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: none;
+}
+
+.font-display {
+  font-family: 'Cabinet Grotesk', sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.font-body {
+  font-family: 'Manrope', sans-serif;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom scrollbar hidden on mobile feel */
+::-webkit-scrollbar { width: 0; background: transparent; }
+
+/* Glass surfaces */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Phone shell on desktop */
+.phone-shell {
+  max-width: 28rem;
+  margin: 0 auto;
+  width: 100%;
+  min-height: 100vh;
+  background: var(--bg);
+  position: relative;
+  box-shadow: 0 30px 80px -20px rgba(34, 72, 52, 0.15);
+}
+
+/* Hero card overlay */
+.hero-card {
+  position: relative;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.hero-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(34, 72, 52, 0.78) 0%, rgba(26, 58, 41, 0.92) 100%);
+  z-index: 1;
+}
+
+.hero-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.pill-glass {
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+.bento {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 0.875rem;
+}
+
+.label-overline {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-tertiary);
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up { animation: fadeUp 0.4s ease-out both; }
+
+/* Disable iOS tap highlight */
+button, a { -webkit-tap-highlight-color: transparent; }
