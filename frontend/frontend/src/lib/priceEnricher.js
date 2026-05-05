@@ -1,45 +1,29 @@
 /**
  * priceEnricher.js
  *
- * Fetches live NSE stock prices from the browser via Yahoo Finance.
- * Uses allorigins.win to bypass CORS restrictions (corsproxy.io was 403ing).
+ * Fetches live NSE stock prices via a Netlify serverless function.
+ * The function runs on Netlify's servers (not Render) so Yahoo Finance
+ * never blocks it. No CORS issues since it's the same domain.
  *
- * Price path: data.chart.result[0].meta.regularMarketPrice
- * Symbol format: HDFCBANK → HDFCBANK.NS
+ * Function endpoint: /.netlify/functions/stock-price?symbol=ICICIBANK
  */
-
-const YAHOO_BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
-
-// Try these proxies in order until one works
-const PROXIES = [
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
-];
-
-async function fetchWithProxy(yahooUrl) {
-  for (const makeProxied of PROXIES) {
-    try {
-      const res = await fetch(makeProxied(yahooUrl));
-      if (!res.ok) continue;
-      const data = await res.json();
-      const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-      if (typeof price === "number") return price;
-    } catch {
-      // try next proxy
-    }
-  }
-  return null;
-}
 
 /**
  * Fetch a single live price for an NSE symbol.
- * Returns the price as a number, or null if all proxies fail.
+ * Returns the price as a number, or null if fetch fails.
  */
 export async function fetchLivePriceBrowser(symbol) {
   if (!symbol) return null;
-  const ticker = symbol.includes(".") ? symbol : `${symbol}.NS`;
-  const yahooUrl = `${YAHOO_BASE}/${ticker}?interval=1d&range=1d`;
-  return fetchWithProxy(yahooUrl);
+  try {
+    const res = await fetch(
+      `/.netlify/functions/stock-price?symbol=${encodeURIComponent(symbol)}`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data.price === "number" ? data.price : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
