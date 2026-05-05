@@ -2,7 +2,7 @@ from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-import os, json, re, logging, uuid, httpx, requests
+import os, json, re, logging, uuid, httpx, requests, zipfile, io, csv
 from pathlib import Path
 from pydantic import BaseModel
 from typing import List, Optional
@@ -49,39 +49,97 @@ Strict rules:
 - Risk-reward minimum 1:1.5. Stop loss must be tight (3-5% below entry).
   You ALWAYS respond in pure valid JSON ONLY - no markdown, no code fences, no explanation outside JSON."""
 
+# ── BSE Bhavcopy Price Cache ──────────────────────────────────────────────────
+
+_bhavcopy_cache: dict = {}  # symbol -> close price, loaded once per day
+
+def _load_bhavcopy() -> dict:
+    """Download BSE bhavcopy CSV for today (or yesterday) and return symbol->price dict."""
+    from datetime import datetime, timedelta, timezone
+    IST = timezone(timedelta(hours=5, minutes=30))
+    now = datetime.now(IST)
+
+    # Try today first, then go back up to 5 days (weekends/holidays)
+    for days_back in range(6):
+        dt = now - timedelta(days=days_back)
+        # Skip future date (before 6 PM IST bhavcopy is yesterday's)
+        if days_back == 0 and now.hour < 18:
+            dt = now - timedelta(days=1)
+
+        dd = dt.strftime("%d")
+        mm = dt.strftime("%m")
+        yy = dt.strftime("%y")
+        url = f"https://www.bseindia.com/download/BhavCopy/Equity/EQ{dd}{mm}{yy}_CSV.ZIP"
+
+        try:
+            headers = {"User-Agent": "Mozilla/5.0"}
+            r = requests.get(url, headers=headers, timeout=15)
+            if r.status_code == 200 and len(r.content) > 1000:
+                z = zipfile.ZipFile(io.BytesIO(r.content))
+                csv_name = z.namelist()[0]
+                csv_data = z.read(csv_name).decode("utf-8")
+                reader = csv.DictReader(io.StringIO(csv_data))
+                prices = {}
+                for row in reader:
+                    sym = row.get("SYMBOL", "").strip().upper()
+                    close = row.get("CLOSE", "") or row.get("close", "")
+                    try:
+                        if sym and close:
+                            prices[sym] = round(float(close), 2)
+                    except ValueError:
+                        pass
+                if prices:
+                    logger.info(f"Loaded BSE bhavcopy for {dt.date()}: {len(prices)} symbols")
+                    return prices
+        except Exception as e:
+            logger.warning(f"BSE bhavcopy fetch failed for {dt.date()}: {e}")
+
+    return {}
+
+def _get_bhavcopy() -> dict:
+    """Return today's bhavcopy, loading once and caching in memory."""
+    global _bhavcopy_cache
+    if not _bhavcopy_cache:
+        _bhavcopy_cache = _load_bhavcopy()
+    return _bhavcopy_cache
+
 def get_live_price(symbol: str):
-    """Fetch NSE stock price using Twelve Data API."""
-    api_key = os.environ.get('TWELVE_DATA_KEY')
-    if not api_key:
-        return None
+    """Fetch previous-day close from BSE bhavcopy (free, no auth)."""
     try:
-        url = f"https://api.twelvedata.com/price?symbol={symbol.upper()}&exchange=NSE&apikey={api_key}"
-        r = requests.get(url, timeout=10)
-        if r.status_code == 200:
-            data = r.json()
-            price = data.get("price")
-            if price and str(price) != "nan":
-                return round(float(price), 2)
+        prices = _get_bhavcopy()
+        price = prices.get(symbol.upper().strip())
+        if price:
+            return price
     except Exception as e:
-        logger.warning(f"Twelve Data price fetch failed for {symbol}: {e}")
+        logger.warning(f"Bhavcopy price lookup failed for {symbol}: {e}")
     return None
 
 def get_live_nifty():
-    """Fetch Nifty 50 level using Twelve Data API."""
-    api_key = os.environ.get('TWELVE_DATA_KEY')
-    if not api_key:
-        return None
+    """Fetch Nifty 50 from BSE bhavcopy index data."""
     try:
-        # NIFTY 50 index symbol on Twelve Data
-        url = f"https://api.twelvedata.com/price?symbol=NIFTY&exchange=NSE&apikey={api_key}"
-        r = requests.get(url, timeout=10)
-        if r.status_code == 200:
-            data = r.json()
-            price = data.get("price")
-            if price and str(price) != "nan":
-                return round(float(price), 2)
+        from datetime import datetime, timedelta, timezone
+        IST = timezone(timedelta(hours=5, minutes=30))
+        now = datetime.now(IST)
+        for days_back in range(6):
+            dt = now - timedelta(days=days_back)
+            if days_back == 0 and now.hour < 18:
+                dt = now - timedelta(days=1)
+            dd = dt.strftime("%d")
+            mm = dt.strftime("%m")
+            yy = dt.strftime("%y")
+            url = f"https://www.bseindia.com/download/BhavCopy/Equity/IND_CLOSE_ALL_{dd}{mm}{yy}.CSV"
+            headers = {"User-Agent": "Mozilla/5.0"}
+            r = requests.get(url, headers=headers, timeout=15)
+            if r.status_code == 200 and len(r.content) > 100:
+                reader = csv.DictReader(io.StringIO(r.content.decode("utf-8")))
+                for row in reader:
+                    name = row.get("IndicesName", "") or row.get("Index Name", "")
+                    if "NIFTY 50" in name.upper() or "NIFTY50" in name.upper():
+                        close = row.get("Closingindex", "") or row.get("Close", "")
+                        if close:
+                            return round(float(close), 2)
     except Exception as e:
-        logger.warning(f"Twelve Data Nifty fetch failed: {e}")
+        logger.warning(f"BSE Nifty fetch failed: {e}")
     return None
 
 def get_market_news():
@@ -267,7 +325,7 @@ Respond as JSON:
     data = await call_llm(f"pick-{sid}-{datetime.now().strftime('%Y%m%d%H')}", prompt)
     if live_price:
         data["current_price"] = live_price
-        data["price_source"] = "live"
+        data["price_source"] = "prev_close"
     else:
         data["price_source"] = "ai_estimate"
     return data
@@ -326,7 +384,7 @@ Pick 3-4 NSE stocks based on real news above. Respond as JSON:
         live = get_live_price(p.get("symbol", ""))
         if live:
             p["current_price"] = live
-            p["price_source"] = "live"
+            p["price_source"] = "prev_close"
         else:
             p["price_source"] = "ai_estimate"
     return data
@@ -380,7 +438,7 @@ Give advice based on REAL live prices and news as JSON:
         symbol = it.get("symbol", "")
         if symbol in live_prices:
             it["current_price"] = live_prices[symbol]
-            it["price_source"] = "live"
+            it["price_source"] = "prev_close"
         else:
             it["price_source"] = "ai_estimate"
     return data
