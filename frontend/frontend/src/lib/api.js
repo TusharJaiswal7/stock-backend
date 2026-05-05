@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://stock-advisor-backend-v4og.onrender.com";
+const BACKEND_URL =
+  process.env.REACT_APP_BACKEND_URL ||
+  "https://stock-advisor-backend-v4og.onrender.com";
 export const API = `${BACKEND_URL}/api`;
 
 export const fetchTodayPlan = async (force = false) => {
@@ -26,7 +28,6 @@ export const fetchPortfolioPlan = async (risk_appetite = "conservative") => {
   return r.data;
 };
 
-export const fetchLivePrice = async (symbol) => {
-  const r = await axios.get(`${API}/live-price/${symbol}`);
-  return r.data;
-};
+// NOTE: fetchLivePrice (server-side) has been removed — Render.com IPs are
+// blocked by NSE/Yahoo. Use enrichPickWithLivePrice from priceEnricher.js
+// instead, which fetches directly from the user's browser.
