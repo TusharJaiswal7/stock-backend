@@ -63,24 +63,30 @@ async def fetch_live_price(symbol: str):
     return None
 
 async def call_llm(session_id: str, prompt: str) -> dict:
-    if not GEMINI_API_KEY:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not set.")
+    api_key = os.environ.get('GROQ_API_KEY')
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY not set.")
     full_prompt = f"{EXPERT_PERSONA}\n\n{prompt}"
     payload = {
-        "contents": [{"parts": [{"text": full_prompt}]}],
-        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 2048}
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "user", "content": full_prompt}],
+        "temperature": 0.7,
+        "max_tokens": 2048
     }
     async with httpx.AsyncClient(timeout=60.0) as http:
         response = await http.post(
-            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+            "https://api.groq.com/openai/v1/chat/completions",
             json=payload,
-            headers={"Content-Type": "application/json"}
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
         )
     if response.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"Gemini error: {response.status_code}")
+        raise HTTPException(status_code=502, detail=f"Groq error: {response.status_code}")
     data = response.json()
     try:
-        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+        raw_text = data["choices"][0]["message"]["content"]
         return extract_json(raw_text)
     except Exception as e:
         raise HTTPException(status_code=502, detail="AI returned invalid format. Retry.")
