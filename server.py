@@ -49,59 +49,40 @@ Strict rules:
 - Risk-reward minimum 1:1.5. Stop loss must be tight (3-5% below entry).
   You ALWAYS respond in pure valid JSON ONLY - no markdown, no code fences, no explanation outside JSON."""
 
-def get_nse_headers():
-    return {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "*/*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Referer": "https://www.nseindia.com/",
-        "Connection": "keep-alive",
-    }
-
-def get_nse_session():
-    session = requests.Session()
-    try:
-        session.get(
-            "https://www.nseindia.com",
-            headers=get_nse_headers(),
-            timeout=10
-        )
-    except Exception:
-        pass
-    return session
-
 def get_live_price(symbol: str):
-    """Fetch live NSE stock price using NSE India API."""
+    """Fetch NSE stock price using Stooq - reliable from cloud servers."""
     try:
-        session = get_nse_session()
-        url = f"https://www.nseindia.com/api/quote-equity?symbol={symbol.upper()}"
-        r = session.get(url, headers=get_nse_headers(), timeout=10)
+        ticker = symbol.upper().strip() + ".NS"
+        url = f"https://stooq.com/q/l/?s={ticker}&f=sd2t2ohlcvn&e=csv"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers, timeout=10)
         if r.status_code == 200:
-            data = r.json()
-            price = data.get("priceInfo", {}).get("lastPrice")
-            if price:
-                return round(float(price), 2)
+            lines = r.text.strip().split("\n")
+            if len(lines) >= 2:
+                parts = lines[1].split(",")
+                # CSV columns: Symbol,Date,Time,Open,High,Low,Close,Volume,Name
+                close = parts[6].strip()
+                if close and close != "N/D":
+                    return round(float(close), 2)
     except Exception as e:
-        logger.warning(f"NSE price fetch failed for {symbol}: {e}")
+        logger.warning(f"Stooq price fetch failed for {symbol}: {e}")
     return None
 
 def get_live_nifty():
-    """Fetch live Nifty 50 index value from NSE India."""
+    """Fetch Nifty 50 level using Stooq."""
     try:
-        session = get_nse_session()
-        r = session.get(
-            "https://www.nseindia.com/api/allIndices",
-            headers=get_nse_headers(),
-            timeout=10
-        )
+        url = "https://stooq.com/q/l/?s=^nsei&f=sd2t2ohlcvn&e=csv"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers, timeout=10)
         if r.status_code == 200:
-            data = r.json()
-            for index in data.get("data", []):
-                if index.get("index") == "NIFTY 50":
-                    return round(float(index.get("last", 0)), 2)
+            lines = r.text.strip().split("\n")
+            if len(lines) >= 2:
+                parts = lines[1].split(",")
+                close = parts[6].strip()
+                if close and close != "N/D":
+                    return round(float(close), 2)
     except Exception as e:
-        logger.warning(f"Nifty fetch failed: {e}")
+        logger.warning(f"Stooq Nifty fetch failed: {e}")
     return None
 
 def get_market_news():
