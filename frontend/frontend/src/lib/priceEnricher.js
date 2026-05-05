@@ -1,14 +1,15 @@
 /**
  * priceEnricher.js
  *
- * Fetches live NSE stock prices directly from the browser using Yahoo Finance.
- * The browser is never blocked by NSE/Yahoo IP restrictions unlike server IPs.
+ * Fetches live NSE stock prices from the browser via Yahoo Finance.
+ * Routes through corsproxy.io to bypass CORS restrictions.
  *
  * Price path: data.chart.result[0].meta.regularMarketPrice
  * Symbol format: HDFCBANK → HDFCBANK.NS
  */
 
 const YAHOO_BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
+const CORS_PROXY = "https://corsproxy.io/?";
 
 /**
  * Fetch a single live price for an NSE symbol.
@@ -17,9 +18,11 @@ const YAHOO_BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
 export async function fetchLivePriceBrowser(symbol) {
   if (!symbol) return null;
   const ticker = symbol.includes(".") ? symbol : `${symbol}.NS`;
-  const url = `${YAHOO_BASE}/${ticker}?interval=1d&range=1d`;
+  const yahooUrl = `${YAHOO_BASE}/${ticker}?interval=1d&range=1d`;
+  const proxiedUrl = `${CORS_PROXY}${encodeURIComponent(yahooUrl)}`;
+
   try {
-    const res = await fetch(url);
+    const res = await fetch(proxiedUrl);
     if (!res.ok) return null;
     const data = await res.json();
     const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
@@ -40,7 +43,6 @@ export async function enrichPickWithLivePrice(pick) {
   if (livePrice !== null) {
     return { ...pick, current_price: livePrice, price_source: "live" };
   }
-  // Keep AI estimate, but mark it clearly
   return { ...pick, price_source: "ai_est" };
 }
 
