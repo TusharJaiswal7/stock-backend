@@ -50,39 +50,38 @@ Strict rules:
   You ALWAYS respond in pure valid JSON ONLY - no markdown, no code fences, no explanation outside JSON."""
 
 def get_live_price(symbol: str):
-    """Fetch NSE stock price using Stooq - reliable from cloud servers."""
+    """Fetch NSE stock price using Twelve Data API."""
+    api_key = os.environ.get('TWELVE_DATA_KEY')
+    if not api_key:
+        return None
     try:
-        ticker = symbol.upper().strip() + ".NS"
-        url = f"https://stooq.com/q/l/?s={ticker}&f=sd2t2ohlcvn&e=csv"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(url, headers=headers, timeout=10)
+        url = f"https://api.twelvedata.com/price?symbol={symbol.upper()}&exchange=NSE&apikey={api_key}"
+        r = requests.get(url, timeout=10)
         if r.status_code == 200:
-            lines = r.text.strip().split("\n")
-            if len(lines) >= 2:
-                parts = lines[1].split(",")
-                # CSV columns: Symbol,Date,Time,Open,High,Low,Close,Volume,Name
-                close = parts[6].strip()
-                if close and close != "N/D":
-                    return round(float(close), 2)
+            data = r.json()
+            price = data.get("price")
+            if price and str(price) != "nan":
+                return round(float(price), 2)
     except Exception as e:
-        logger.warning(f"Stooq price fetch failed for {symbol}: {e}")
+        logger.warning(f"Twelve Data price fetch failed for {symbol}: {e}")
     return None
 
 def get_live_nifty():
-    """Fetch Nifty 50 level using Stooq."""
+    """Fetch Nifty 50 level using Twelve Data API."""
+    api_key = os.environ.get('TWELVE_DATA_KEY')
+    if not api_key:
+        return None
     try:
-        url = "https://stooq.com/q/l/?s=^nsei&f=sd2t2ohlcvn&e=csv"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(url, headers=headers, timeout=10)
+        # NIFTY 50 index symbol on Twelve Data
+        url = f"https://api.twelvedata.com/price?symbol=NIFTY&exchange=NSE&apikey={api_key}"
+        r = requests.get(url, timeout=10)
         if r.status_code == 200:
-            lines = r.text.strip().split("\n")
-            if len(lines) >= 2:
-                parts = lines[1].split(",")
-                close = parts[6].strip()
-                if close and close != "N/D":
-                    return round(float(close), 2)
+            data = r.json()
+            price = data.get("price")
+            if price and str(price) != "nan":
+                return round(float(price), 2)
     except Exception as e:
-        logger.warning(f"Stooq Nifty fetch failed: {e}")
+        logger.warning(f"Twelve Data Nifty fetch failed: {e}")
     return None
 
 def get_market_news():
