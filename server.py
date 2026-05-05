@@ -97,7 +97,8 @@ async def root():
 
 @api_router.get("/health")
 async def health():
-    return {"status": "ok", "llm_configured": bool(GEMINI_API_KEY)}
+    return {"status": "ok", "llm_configured": bool(os.environ.get('GROQ_API_KEY'))}
+
 
 @api_router.post("/today-plan")
 async def today_plan(force: bool = False):
