@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "../c
 import { toast } from "sonner";
 import { loadPortfolio, savePortfolio } from "../lib/storage";
 import { fetchPortfolioAdvice } from "../lib/api";
+import { fetchLivePriceBrowser } from "../lib/priceEnricher";
 
 const fmt = (n) =>
   typeof n === "number"
@@ -65,8 +66,17 @@ export const Portfolio = () => {
     try {
       setLoadingAdvice(true);
       const r = await fetchPortfolioAdvice(items);
+      // Fetch live prices for each holding directly from the browser
+      const liveResults = await Promise.all(
+        (r.items || []).map(async (it) => {
+          const livePrice = await fetchLivePriceBrowser(it.symbol);
+          return livePrice !== null
+            ? { ...it, current_price: livePrice, price_source: "live" }
+            : { ...it, price_source: "ai_est" };
+        })
+      );
       const map = {};
-      r.items?.forEach((it) => (map[it.symbol] = it));
+      liveResults.forEach((it) => (map[it.symbol] = it));
       setAdvice(map);
       toast.success("AI advice updated");
     } catch (e) {
@@ -230,6 +240,23 @@ export const Portfolio = () => {
                     </p>
                     <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
                       {h.qty} qty · avg ₹{fmt(h.buy_price)}
+                      {a && (
+                        <span
+                          className="ml-2 text-[8.5px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded"
+                          style={{
+                            background:
+                              a.price_source === "live"
+                                ? "rgba(46, 109, 78, 0.12)"
+                                : "rgba(212, 139, 62, 0.12)",
+                            color:
+                              a.price_source === "live"
+                                ? "var(--accent-buy)"
+                                : "var(--accent-hold)",
+                          }}
+                        >
+                          {a.price_source === "live" ? "● Live" : "AI Est."}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="text-right">

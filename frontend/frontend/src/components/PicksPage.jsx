@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchStockPick, fetchPortfolioPlan } from "../lib/api";
+import { enrichPickWithLivePrice, enrichPicksWithLivePrices } from "../lib/priceEnricher";
 import { StockCard } from "./StockCard";
 import { Skeleton } from "../components/ui/skeleton";
 import { Plus, Sparkle, Wallet, Lightning } from "@phosphor-icons/react";
@@ -21,7 +22,9 @@ export const PicksPage = () => {
 
   const generate = async (symbol) => {
     try {
-      const p = await fetchStockPick(symbol);
+      const raw = await fetchStockPick(symbol);
+      // Fetch live price from browser (Yahoo Finance) — never blocked
+      const p = await enrichPickWithLivePrice(raw);
       setPicks((prev) => {
         const exists = prev.find((x) => x.symbol === p.symbol);
         return exists ? prev.map((x) => (x.symbol === p.symbol ? p : x)) : [p, ...prev];
@@ -58,12 +61,14 @@ export const PicksPage = () => {
     try {
       setPlanLoading(true);
       const data = await fetchPortfolioPlan("conservative");
-      setPlan(data);
-      // also push picks into the cards stream
-      const newPicks = data.picks.map((p) => ({ ...p }));
+      // Enrich plan picks with live browser prices concurrently
+      const enrichedPicks = await enrichPicksWithLivePrices(data.picks);
+      const enrichedData = { ...data, picks: enrichedPicks };
+      setPlan(enrichedData);
+      // push picks into the cards stream
       setPicks((prev) => {
         const map = new Map(prev.map((x) => [x.symbol, x]));
-        newPicks.forEach((p) => map.set(p.symbol, p));
+        enrichedPicks.forEach((p) => map.set(p.symbol, p));
         return Array.from(map.values());
       });
       toast.success("₹25k plan ready");
