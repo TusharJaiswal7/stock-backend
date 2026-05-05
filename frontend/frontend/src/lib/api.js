@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BACKEND_URL = const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://stock-advisor-backend-v4og.onrender.com";
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://stock-advisor-backend-v4og.onrender.com";
 export const API = `${BACKEND_URL}/api`;
 
 export const fetchTodayPlan = async (force = false) => {
